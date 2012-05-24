@@ -107,7 +107,13 @@ public class HelloADKActivity extends Activity implements Runnable {
         filter.addAction(UsbManager.ACTION_USB_ACCESSORY_DETACHED);
         registerReceiver(mUsbReceiver, filter);
 
-        setContentView(R.layout.main);
+		//re-creation?
+        if (getLastNonConfigurationInstance() != null) {
+			mAccessory = (UsbAccessory) getLastNonConfigurationInstance();
+			openAccessory(mAccessory);
+		}
+		
+		setContentView(R.layout.main);
         
         mToggleButton = (ToggleButton) findViewById(R.id.toggleBtn);
         mStatusView = (TextView) findViewById(R.id.status);
