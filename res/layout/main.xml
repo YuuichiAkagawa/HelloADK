@@ -23,5 +23,9 @@
         android:layout_height="wrap_content"
         android:layout_margin="10dip" />
 
+    <SeekBar
+        android:id="@+id/seekBar1"
+        android:layout_width="282dp"
+        android:layout_height="wrap_content" />
     
 </LinearLayout>

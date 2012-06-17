@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.ammlab.android.helloadk;
 
 import java.io.FileDescriptor;
@@ -36,6 +35,8 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.SeekBar;
+import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
@@ -59,6 +60,7 @@ public class HelloADKActivity extends Activity implements Runnable {
     private ToggleButton mToggleButton;
     private ToggleButton mBtnStatusButton;
     private TextView mStatusView;
+    private SeekBar mSeekBar;
 
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
 
@@ -68,12 +70,9 @@ public class HelloADKActivity extends Activity implements Runnable {
 
             if (ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
-                    // Intent からアクセサリを取得
                     UsbAccessory accessory = UsbManager.getAccessory(intent);
 
-                    // パーミッションがあるかチェック
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        // 接続を開く
                         openAccessory(accessory);
                     } else {
                         Log.d(TAG, "permission denied for accessory " + accessory);
@@ -81,10 +80,8 @@ public class HelloADKActivity extends Activity implements Runnable {
                     mPermissionRequestPending = false;
                 }
             } else if (UsbManager.ACTION_USB_ACCESSORY_DETACHED.equals(action)) {
-                // Intent からアクセサリを取得
                 UsbAccessory accessory = UsbManager.getAccessory(intent);
                 if (accessory != null && accessory.equals(mAccessory)) {
-                    // 接続を閉じる
                     closeAccessory();
                 }
             }
@@ -95,31 +92,31 @@ public class HelloADKActivity extends Activity implements Runnable {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // UsbManager のインスタンスを取得
         mUsbManager = UsbManager.getInstance(this);
 
-        // オレオレパーミッション用 Broadcast Intent
+        // Broadcast Intent for myPermission
         mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
 
-        // オレオレパーミッション Intent とアクセサリが取り外されたときの Intent を登録
+        // Register Intent myPermission and remove accessory
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_ACCESSORY_DETACHED);
         registerReceiver(mUsbReceiver, filter);
 
-		//re-creation?
-        if (getLastNonConfigurationInstance() != null) {
+/////////////////////////////////////////////////////////////////////////////        
+		if (getLastNonConfigurationInstance() != null) {
 			mAccessory = (UsbAccessory) getLastNonConfigurationInstance();
 			openAccessory(mAccessory);
 		}
-		
-		setContentView(R.layout.main);
+/////////////////////////////////////////////////////////////////////////////        
+        
+        setContentView(R.layout.main);
         
         mToggleButton = (ToggleButton) findViewById(R.id.toggleBtn);
         mStatusView = (TextView) findViewById(R.id.status);
         mBtnStatusButton= (ToggleButton) findViewById(R.id.btnstatusBtn);
+        mSeekBar = (SeekBar) findViewById(R.id.seekBar1);
         
-        //ボタンを押したときのハンドラ(アクセサリのLEDスイッチ)
         mToggleButton.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -127,6 +124,28 @@ public class HelloADKActivity extends Activity implements Runnable {
                 byte value = (byte) (isChecked ? 0x1 : 0x0);
                 sendCommand(command, value);
             }
+        });
+        
+        mSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+        	@Override
+        	public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        		// Dragging knob
+        		byte value = (byte)(progress*255/100);
+        		byte command = 0x2;
+        		Log.d(TAG, "Current Value:"+progress+","+value);
+        		sendCommand(command, value);
+        	}
+ 
+        	@Override
+        	public void onStartTrackingTouch(SeekBar seekBar) {
+        		// Touch knob
+        	}
+ 
+        	@Override
+        	public void onStopTrackingTouch(SeekBar seekBar) {
+        		// Release knob
+        		//mSeekBar.setProgress(50);
+        	}
         });
 
         enableControls(false);
@@ -140,18 +159,14 @@ public class HelloADKActivity extends Activity implements Runnable {
             return;
         }
 
-        // USB Accessory の一覧を取得
         UsbAccessory[] accessories = mUsbManager.getAccessoryList();
         UsbAccessory accessory = (accessories == null ? null : accessories[0]);
         if (accessory != null) {
-            // Accessory にアクセスする権限があるかチェック
             if (mUsbManager.hasPermission(accessory)) {
-                // 接続を開く
                 openAccessory(accessory);
             } else {
                 synchronized (mUsbReceiver) {
                     if (!mPermissionRequestPending) {
-                        // パーミッションを依頼
                         mUsbManager.requestPermission(accessory, mPermissionIntent);
                         mPermissionRequestPending = true;
                     }
@@ -175,18 +190,16 @@ public class HelloADKActivity extends Activity implements Runnable {
     }
 
     private void openAccessory(UsbAccessory accessory) {
-        // アクセサリにアクセスするためのファイルディスクリプタを取得
         mFileDescriptor = mUsbManager.openAccessory(accessory);
 
         if (mFileDescriptor != null) {
             mAccessory = accessory;
             FileDescriptor fd = mFileDescriptor.getFileDescriptor();
 
-            // 入出力用のストリームを確保
             mInputStream = new FileInputStream(fd);
             mOutputStream = new FileOutputStream(fd);
 
-            // この中でアクセサリとやりとりする
+            // communication thread start
             Thread thread = new Thread(null, this, "DemoKit");
             thread.start();
             Log.d(TAG, "accessory opened");
@@ -222,33 +235,19 @@ public class HelloADKActivity extends Activity implements Runnable {
 
     private static final int MESSAGE_LED = 1;
 
-    private class LedMsg {
-        private byte on;
-
-        public LedMsg(byte on) {
-            this.on = on;
-        }
-
-        public boolean isOn() {
-            if(on == 0x1)
-                return true;
-            else
-                return false;
-        }
-    }
-
-    // ここでアクセサリと通信する
+    // USB read thread
     @Override
     public void run() {
         int ret = 0;
         byte[] buffer = new byte[16384];
         int i;
 
-        // アクセサリ -> アプリ
+        // Accessory -> Android
         while (ret >= 0) {
             try {
-                ret = mInputStream.read(buffer);
+            	ret = mInputStream.read(buffer);
             } catch (IOException e) {
+            	e.printStackTrace();
                 break;
             }
 
@@ -261,11 +260,9 @@ public class HelloADKActivity extends Activity implements Runnable {
 
                 switch (buffer[i]) {
                     case 0x1:
-                        // 2byte のオレオレプロトコル
-                        // 0x1 0x0 や 0x1 0x1 など
                         if (len >= 2) {
                             Message m = Message.obtain(mHandler, MESSAGE_LED);
-                            m.obj = new LedMsg(buffer[i + 1]);
+                            m.arg1 = (int)buffer[i + 1];
                             mHandler.sendMessage(m);
                             i += 2;
                         }
@@ -281,37 +278,25 @@ public class HelloADKActivity extends Activity implements Runnable {
         }
     }
 
-    // UI スレッドで画面上の表示を変更
+    // Change the view in the UI thread
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case MESSAGE_LED:
-                    LedMsg o = (LedMsg) msg.obj;
-                    handleLedMessage(o);
+                    if(msg.arg1 == 0){
+                    	mBtnStatusButton.setChecked(false);
+                    }else{
+                    	mBtnStatusButton.setChecked(true);
+                    }
                     break;
             }
         }
     };
 
-    private void handleLedMessage(LedMsg l) {
-        if(l.isOn()) {
-        	mBtnStatusButton.setChecked(true);
-        }
-        else {
-        	mBtnStatusButton.setChecked(false);
-        }
-    }
-
-    // アプリ -> アクセサリ
+    // Android -> Accessory
     public void sendCommand(byte command, byte value) {
         byte[] buffer = new byte[2];
-        
-        if(value != 0x1 && value != 0x0)
-            value = 0x0;
-
-        // 2byte のオレオレプロトコル
-        // 0x1 0x0 や 0x1 0x1
         buffer[0] = command;
         buffer[1] = value;
         if (mOutputStream != null) {

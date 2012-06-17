@@ -15,6 +15,7 @@ public final class R {
     }
     public static final class id {
         public static final int btnstatusBtn=0x7f060002;
+        public static final int seekBar1=0x7f060003;
         public static final int status=0x7f060000;
         public static final int toggleBtn=0x7f060001;
     }
