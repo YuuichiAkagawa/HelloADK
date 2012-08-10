@@ -21,7 +21,11 @@
         android:id="@+id/btnstatusBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="10dip" />
+        android:layout_margin="10dip"
+        android:clickable="false"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:longClickable="false" />
 
     <SeekBar
         android:id="@+id/seekBar1"

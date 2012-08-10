@@ -1,6 +1,11 @@
 /*
  * Copyright (C) 2012 Yuuichi Akagawa
  *
+ * This code is modify from yanzm's HelloADK.
+ * https://github.com/yanzm/HelloADK
+ * Original copyright: 
+ *  Copyright (C) 2011 yanzm, uPhyca Inc.,
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -228,7 +233,7 @@ public class HelloADKActivity extends Activity implements Runnable {
         if (enable) {
             mStatusView.setText("connected");
         } else {
-            mStatusView.setText("not connected");
+            mStatusView.setText("not connect");
         }
         mToggleButton.setEnabled(enable);
     }
